@@ -11,16 +11,17 @@ class SDMCheck
   # Not sure what this is, but it's required
   TENANT_ID = 'edfbb1a3-aca2-4ee4-bbbb-9237237736c4'
 
+  # We can't ask for all the appointments at a pharmacy in a 60 day window
+  # Instead we have to make several smaller calls using filters
+  # DAYS_PER_API_CALL states how many days will be included in each filter period
+  DAYS_PER_API_CALL = 10
+
   # Each appointment type has a code name that's required
   # We also give it a human readable name to make it easier in the CSV
   APPOINTMENT_TYPES = {
     moderna: "COVID-19 Vaccine (Moderna Dose 3 or Booster Dose)",
     pfizer: "COVID-19 Vaccine (Pfizer Dose 3 or Booster Dose)",
   }
-
-  # Filter down the dates per query to avoid overwhelming their system
-  NUM_FILTERS = 5
-  FILTER_DAYS = 10
 
   class Pharmacy < Struct.new(:pharmacy)
     def id; pharmacy["id"]; end
@@ -47,11 +48,13 @@ class SDMCheck
     def end_time; appointment["endDateTime"][11...16]; end
   end
 
-  def initialize(cities:)
+  def initialize(cities:, days:)
     @cities = cities
+    @days = days
   end
 
   attr_reader :cities
+  attr_reader :days
 
   def report
     CSV(headers: Appointment::COLUMNS, write_headers: true, force_quotes: true) do |csv|
@@ -66,11 +69,8 @@ class SDMCheck
   end
 
   def filters
-    (0..NUM_FILTERS).map do |i|
-      today = Date.today
-      start_date = today + (i * FILTER_DAYS)
-      end_date = start_date + FILTER_DAYS
-      { startDate: start_date, endDate: end_date }
+    (0..days).each_slice(DAYS_PER_API_CALL).map do |first, *rest, last|
+      { startDate: Date.today + first, endDate: Date.today + (last || days) }
     end
   end
 
@@ -170,11 +170,15 @@ class SDMCheck
 end
 
 options = {
+  # Which cities to include in the search
   cities: ["Toronto", "Mississauga", "Scarborough", "Etobicoke", "Markham", "Richmond Hill", "Thornhill"],
+  # How many days (from today) to include in the search
+  days: 60,
 }
 OptionParser.new do |opts|
   opts.banner = "Usage: sdm_check.rb [options]"
   opts.on("--cities x,y,z", Array, "List of cities to include in search") { |cities| options[:cities] = cities }
+  opts.on("--days 60", Numeric, "Number of days (from today) to include in search") { |days| options[:days] = days }
 end.parse!
 
 SDMCheck.new(**options).report
