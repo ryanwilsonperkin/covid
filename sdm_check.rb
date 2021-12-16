@@ -52,8 +52,7 @@ class SDMCheck
       Parallel.each(APPOINTMENT_TYPES) do |vaccine_name, appointment_type_name|
         Parallel.each(get_available_pharmacies(appointment_type_name)) do |pharmacy|
           Parallel.each(filters) do |filter|
-            appointments = get_available_times(pharmacy.id, pharmacy.appointment_type_id, filter) || []
-            appointments.each { |appointment| csv << Appointment.new(pharmacy, vaccine_name, appointment).to_row }
+            get_available_times(pharmacy, vaccine_name, filter).each { |appointment| csv << appointment.to_row }
           end
         end
       end
@@ -110,7 +109,7 @@ class SDMCheck
       .map { |pharmacy| Pharmacy.new(pharmacy) }
   end
 
-  def get_available_times(pharmacy_id, appointment_type_id, filter)
+  def get_available_times(pharmacy, vaccine_name, filter)
     query = <<-GRAPHQL
       query publicGetAvailableTimes($pharmacyId: String, $appointmentTypeId: Int!, $noOfPeople: Int!, $filter: AvailabilityFilter!) {
         publicGetAvailableTimes(pharmacyId: $pharmacyId, appointmentTypeId: $appointmentTypeId, noOfPeople: $noOfPeople, filter: $filter) {
@@ -120,13 +119,16 @@ class SDMCheck
       }
     GRAPHQL
     variables = { 
-      pharmacyId: pharmacy_id,
-      appointmentTypeId: appointment_type_id,
+      pharmacyId: pharmacy.id,
+      appointmentTypeId: pharmacy.appointment_type_id,
       noOfPeople: 1,
       filter: filter,
     }
-    headers = { 'x-pharmacyid': pharmacy_id }
-    gql(query, variables, headers).dig("data", "publicGetAvailableTimes")
+    headers = { 'x-pharmacyid': pharmacy.id }
+    gql(query, variables, headers)
+      .dig("data", "publicGetAvailableTimes")
+      .then { |available_times| available_times || [] }
+      .map { |appointment| Appointment.new(pharmacy, vaccine_name, appointment) }
   end
   
   private
