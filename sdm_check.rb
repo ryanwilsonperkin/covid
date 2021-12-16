@@ -38,12 +38,7 @@ class SDMCheck
           appointment_type = pharmacy.dig("appointmentTypes", 0, "id")
 
           Parallel.each(filters) do |filter|
-            appointments = get_available_times(pharmacy_id, appointment_type, filter)
-            unless appointments
-              $stderr.puts "Failed to fetch for #{pharmacy_id}, #{appointment_type}, #{filter}"
-              next
-            end
-
+            appointments = get_available_times(pharmacy_id, appointment_type, filter) || []
             appointments.each do |appt|
               csv << [
                 name,
