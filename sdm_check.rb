@@ -25,6 +25,14 @@ class SDMCheck
   NUM_FILTERS = 5
   FILTER_DAYS = 10
 
+  class Pharmacy < Struct.new(:pharmacy)
+    def id; pharmacy["id"]; end
+    def name; pharmacy["name"]; end
+    def appointment_type_id; pharmacy.dig("appointmentTypes", 0, "id"); end
+    def city; pharmacy.dig("pharmacyAddress", "city"); end
+    def store_number; pharmacy["storeNo"]; end
+  end
+
   class Appointment < Struct.new(:pharmacy, :vaccine, :appointment)
     COLUMNS = [:name, :city, :vaccine, :start, :end, :website]
 
@@ -32,26 +40,19 @@ class SDMCheck
       COLUMNS.to_h  { |column| [column, send(column)] }
     end
 
-    def name; pharmacy["name"]; end
-    def city; pharmacy.dig("pharmacyAddress", "city"); end
+    def name; pharmacy.name; end
+    def city; pharmacy.city; end
     def start; appointment["startDateTime"]; end
     def end; appointment["endDateTime"]; end
-    def website
-      "https://www1.shoppersdrugmart.ca/en/store-locator/store/#{store_number}"
-    end
-
-    def store_number; pharmacy["storeNo"]; end
+    def website; "https://www1.shoppersdrugmart.ca/en/store-locator/store/#{pharmacy.store_number}"; end
   end
 
   def report
     CSV(headers: Appointment::COLUMNS, write_headers: true, force_quotes: true) do |csv|
       Parallel.each(APPOINTMENT_TYPES) do |vaccine_name, appointment_type_name|
         Parallel.each(get_available_pharmacies(appointment_type_name)) do |pharmacy|
-          pharmacy_id = pharmacy["id"]
-          appointment_type = pharmacy.dig("appointmentTypes", 0, "id")
-
           Parallel.each(filters) do |filter|
-            appointments = get_available_times(pharmacy_id, appointment_type, filter) || []
+            appointments = get_available_times(pharmacy.id, pharmacy.appointment_type_id, filter) || []
             appointments.each { |appointment| csv << Appointment.new(pharmacy, vaccine_name, appointment).to_row }
           end
         end
@@ -106,6 +107,7 @@ class SDMCheck
       .dig("data", "publicGetEnterprisePharmacies")
       .filter { |pharmacy| FILTER_CITIES.include? pharmacy.dig("pharmacyAddress", "city") }
       .filter { |pharmacy| !pharmacy.dig("appointmentTypes", 0, "isWaitlisted") }
+      .map { |pharmacy| Pharmacy.new(pharmacy) }
   end
 
   def get_available_times(pharmacy_id, appointment_type_id, filter)
