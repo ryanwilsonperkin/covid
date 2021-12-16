@@ -1,6 +1,6 @@
 require 'csv'
 require 'parallel'
-require 'pry'
+require 'optparse'
 require 'faraday'
 require 'faraday_middleware'
 
@@ -17,9 +17,6 @@ class SDMCheck
     moderna: "COVID-19 Vaccine (Moderna Dose 3 or Booster Dose)",
     pfizer: "COVID-19 Vaccine (Pfizer Dose 3 or Booster Dose)",
   }
-
-  # Cities to include
-  FILTER_CITIES = ["Toronto", "Mississauga", "Scarborough", "Etobicoke", "Markham", "Richmond Hill", "Thornhill"]
 
   # Filter down the dates per query to avoid overwhelming their system
   NUM_FILTERS = 5
@@ -49,6 +46,12 @@ class SDMCheck
     def start_time; appointment["startDateTime"][11...16]; end
     def end_time; appointment["endDateTime"][11...16]; end
   end
+
+  def initialize(cities:)
+    @cities = cities
+  end
+
+  attr_reader :cities
 
   def report
     CSV(headers: Appointment::COLUMNS, write_headers: true, force_quotes: true) do |csv|
@@ -107,7 +110,7 @@ class SDMCheck
     headers = {}
     gql(query, variables, headers)
       .dig("data", "publicGetEnterprisePharmacies")
-      .filter { |pharmacy| FILTER_CITIES.include? pharmacy.dig("pharmacyAddress", "city") }
+      .filter { |pharmacy| cities.include? pharmacy.dig("pharmacyAddress", "city") }
       .filter { |pharmacy| !pharmacy.dig("appointmentTypes", 0, "isWaitlisted") }
       .map { |pharmacy| Pharmacy.new(pharmacy) }
   end
@@ -166,4 +169,12 @@ class SDMCheck
   end
 end
 
-SDMCheck.new.report
+options = {
+  cities: ["Toronto", "Mississauga", "Scarborough", "Etobicoke", "Markham", "Richmond Hill", "Thornhill"],
+}
+OptionParser.new do |opts|
+  opts.banner = "Usage: sdm_check.rb [options]"
+  opts.on("--cities x,y,z", Array, "List of cities to include in search") { |cities| options[:cities] = cities }
+end.parse!
+
+SDMCheck.new(**options).report
