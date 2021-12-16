@@ -34,7 +34,7 @@ class SDMCheck
   end
 
   class Appointment < Struct.new(:pharmacy, :vaccine, :appointment)
-    COLUMNS = [:name, :city, :vaccine, :start, :end, :website]
+    COLUMNS = [:name, :city, :vaccine, :time, :website]
 
     def to_row
       COLUMNS.to_h  { |column| [column, send(column)] }
@@ -42,9 +42,12 @@ class SDMCheck
 
     def name; pharmacy.name; end
     def city; pharmacy.city; end
-    def start; appointment["startDateTime"]; end
-    def end; appointment["endDateTime"]; end
+    def time; "#{date} #{start_time} - #{end_time}"; end
     def website; "https://www1.shoppersdrugmart.ca/en/store-locator/store/#{pharmacy.store_number}"; end
+
+    def date; appointment["startDateTime"][0...10]; end
+    def start_time; appointment["startDateTime"][11...16]; end
+    def end_time; appointment["endDateTime"][11...16]; end
   end
 
   def report
