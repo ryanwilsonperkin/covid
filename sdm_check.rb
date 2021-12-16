@@ -31,17 +31,16 @@ class SDMCheck
     { startDate: start_date, endDate: end_date }
   end
 
-  CSV_HEADERS = ["name", "city", "longitude", "latitude", "vaccine", "start", "end"]
+  CSV_HEADERS = ["name", "city", "vaccine", "start", "end", "website"]
 
   def report
     CSV(headers: CSV_HEADERS, write_headers: true, force_quotes: true) do |csv|
       Parallel.each(APPOINTMENT_TYPES) do |vaccine_name, appointment_type_name|
         Parallel.each(get_available_pharmacies(appointment_type_name)) do |pharmacy|
           pharmacy_id = pharmacy["id"]
+          store_number = pharmacy["storeNo"]
           name = pharmacy["name"]
           city = pharmacy.dig("pharmacyAddress", "city")
-          longitude = pharmacy.dig("pharmacyAddress", "longitude")
-          latitude = pharmacy.dig("pharmacyAddress", "latitude")
           appointment_type = pharmacy.dig("appointmentTypes", 0, "id")
 
           Parallel.each(FILTERS) do |filter|
@@ -52,7 +51,14 @@ class SDMCheck
             end
 
             appointments.each do |appt|
-              csv << [name, city, longitude, latitude, vaccine_name, appt["startDateTime"], appt["endDateTime"]]
+              csv << [
+                name,
+                city,
+                vaccine_name,
+                appt["startDateTime"],
+                appt["endDateTime"],
+                "https://www1.shoppersdrugmart.ca/en/store-locator/store/#{store_number}"
+              ]
             end
           end
         end
@@ -66,6 +72,7 @@ class SDMCheck
         publicGetEnterprisePharmacies(appointmentTypeName: $appointmentTypeName, enterpriseName: $enterpriseName, storeNo: $storeNo) {
           id
           name
+          storeNo
           pharmacyAddress {
             unit
             streetNumber
