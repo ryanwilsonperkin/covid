@@ -25,30 +25,34 @@ class SDMCheck
   NUM_FILTERS = 5
   FILTER_DAYS = 10
 
-  CSV_HEADERS = ["name", "city", "vaccine", "start", "end", "website"]
+  class Appointment < Struct.new(:pharmacy, :vaccine, :appointment)
+    COLUMNS = [:name, :city, :vaccine, :start, :end, :website]
+
+    def to_row
+      COLUMNS.to_h  { |column| [column, send(column)] }
+    end
+
+    def name; pharmacy["name"]; end
+    def city; pharmacy.dig("pharmacyAddress", "city"); end
+    def start; appointment["startDateTime"]; end
+    def end; appointment["endDateTime"]; end
+    def website
+      "https://www1.shoppersdrugmart.ca/en/store-locator/store/#{store_number}"
+    end
+
+    def store_number; pharmacy["storeNo"]; end
+  end
 
   def report
-    CSV(headers: CSV_HEADERS, write_headers: true, force_quotes: true) do |csv|
+    CSV(headers: Appointment::COLUMNS, write_headers: true, force_quotes: true) do |csv|
       Parallel.each(APPOINTMENT_TYPES) do |vaccine_name, appointment_type_name|
         Parallel.each(get_available_pharmacies(appointment_type_name)) do |pharmacy|
           pharmacy_id = pharmacy["id"]
-          store_number = pharmacy["storeNo"]
-          name = pharmacy["name"]
-          city = pharmacy.dig("pharmacyAddress", "city")
           appointment_type = pharmacy.dig("appointmentTypes", 0, "id")
 
           Parallel.each(filters) do |filter|
             appointments = get_available_times(pharmacy_id, appointment_type, filter) || []
-            appointments.each do |appt|
-              csv << [
-                name,
-                city,
-                vaccine_name,
-                appt["startDateTime"],
-                appt["endDateTime"],
-                "https://www1.shoppersdrugmart.ca/en/store-locator/store/#{store_number}"
-              ]
-            end
+            appointments.each { |appointment| csv << Appointment.new(pharmacy, vaccine_name, appointment).to_row }
           end
         end
       end
