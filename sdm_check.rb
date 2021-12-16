@@ -24,12 +24,6 @@ class SDMCheck
   # Filter down the dates per query to avoid overwhelming their system
   NUM_FILTERS = 5
   FILTER_DAYS = 10
-  FILTERS = (0..NUM_FILTERS).map do |i|
-    today = Date.today
-    start_date = today + (i * FILTER_DAYS)
-    end_date = start_date + FILTER_DAYS
-    { startDate: start_date, endDate: end_date }
-  end
 
   CSV_HEADERS = ["name", "city", "vaccine", "start", "end", "website"]
 
@@ -43,7 +37,7 @@ class SDMCheck
           city = pharmacy.dig("pharmacyAddress", "city")
           appointment_type = pharmacy.dig("appointmentTypes", 0, "id")
 
-          Parallel.each(FILTERS) do |filter|
+          Parallel.each(filters) do |filter|
             appointments = get_available_times(pharmacy_id, appointment_type, filter)
             unless appointments
               $stderr.puts "Failed to fetch for #{pharmacy_id}, #{appointment_type}, #{filter}"
@@ -63,6 +57,15 @@ class SDMCheck
           end
         end
       end
+    end
+  end
+
+  def filters
+    (0..NUM_FILTERS).map do |i|
+      today = Date.today
+      start_date = today + (i * FILTER_DAYS)
+      end_date = start_date + FILTER_DAYS
+      { startDate: start_date, endDate: end_date }
     end
   end
 
