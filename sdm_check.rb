@@ -126,11 +126,7 @@ class SDMCheck
   private
 
   def gql(query, variables = {}, headers = {})
-    body = {
-      query: query,
-      variables: variables,
-    }
-    client.post('/graphql', body, headers).body
+    client.post('/graphql', {query: query, variables: variables}, headers).body
   end
 
   def client
