@@ -41,7 +41,7 @@ class SDMCheck
     def name; pharmacy.name; end
     def city; pharmacy.city; end
     def time; "#{date} #{start_time} - #{end_time}"; end
-    def website; "https://www1.shoppersdrugmart.ca/en/store-locator/store/#{pharmacy.store_number}"; end
+    def website; "https://shoppersdrugmart.medmeapp.com/#{pharmacy.store_number}/schedule/#{pharmacy.appointment_type_id}"; end
 
     def date; appointment["startDateTime"][0...10]; end
     def start_time; appointment["startDateTime"][11...16]; end
