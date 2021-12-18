@@ -19,8 +19,9 @@ class SDMCheck
   # Each appointment type has a code name that's required
   # We also give it a human readable name to make it easier in the CSV
   APPOINTMENT_TYPES = {
-    moderna: "COVID-19 Vaccine (Moderna Dose 3 or Booster Dose)",
-    pfizer: "COVID-19 Vaccine (Pfizer Dose 3 or Booster Dose)",
+    "moderna" => "COVID-19 Vaccine (Moderna Dose 3 or Booster Dose)",
+    "pfizer" => "COVID-19 Vaccine (Pfizer Dose 3 or Booster Dose)",
+    "screening" => "Asymptomatic COVID-19 Rapid Antigen Screening",
   }
 
   class Pharmacy < Struct.new(:pharmacy)
@@ -31,8 +32,8 @@ class SDMCheck
     def store_number; pharmacy["storeNo"]; end
   end
 
-  class Appointment < Struct.new(:pharmacy, :vaccine, :appointment)
-    COLUMNS = [:name, :city, :vaccine, :time, :website]
+  class Appointment < Struct.new(:pharmacy, :appointment_type_name, :appointment)
+    COLUMNS = [:name, :city, :appointment_type_name, :time, :website]
 
     def to_row
       COLUMNS.to_h  { |column| [column, send(column)] }
@@ -48,24 +49,30 @@ class SDMCheck
     def end_time; appointment["endDateTime"][11...16]; end
   end
 
-  def initialize(cities:, days:)
+  def initialize(cities:, days:, types:)
     @cities = cities
     @days = days
+    @types = types
   end
 
   attr_reader :cities
   attr_reader :days
+  attr_reader :types
 
   def report
     CSV(headers: Appointment::COLUMNS, write_headers: true, force_quotes: true) do |csv|
-      Parallel.each(APPOINTMENT_TYPES) do |vaccine_name, appointment_type_name|
+      Parallel.each(appointment_types) do |appointment_type_name|
         Parallel.each(get_available_pharmacies(appointment_type_name)) do |pharmacy|
           Parallel.each(filters) do |filter|
-            get_available_times(pharmacy, vaccine_name, filter).each { |appointment| csv << appointment.to_row }
+            get_available_times(pharmacy, appointment_type_name, filter).each { |appointment| csv << appointment.to_row }
           end
         end
       end
     end
+  end
+
+  def appointment_types
+    APPOINTMENT_TYPES.slice(*types).values
   end
 
   def filters
@@ -115,7 +122,7 @@ class SDMCheck
       .map { |pharmacy| Pharmacy.new(pharmacy) }
   end
 
-  def get_available_times(pharmacy, vaccine_name, filter)
+  def get_available_times(pharmacy, appointment_type_name, filter)
     query = <<-GRAPHQL
       query publicGetAvailableTimes($pharmacyId: String, $appointmentTypeId: Int!, $noOfPeople: Int!, $filter: AvailabilityFilter!) {
         publicGetAvailableTimes(pharmacyId: $pharmacyId, appointmentTypeId: $appointmentTypeId, noOfPeople: $noOfPeople, filter: $filter) {
@@ -134,7 +141,7 @@ class SDMCheck
     gql(query, variables, headers)
       .dig("data", "publicGetAvailableTimes")
       .then { |available_times| available_times || [] }
-      .map { |appointment| Appointment.new(pharmacy, vaccine_name, appointment) }
+      .map { |appointment| Appointment.new(pharmacy, appointment_type_name, appointment) }
   end
   
   private
@@ -174,11 +181,14 @@ options = {
   cities: ["Toronto", "Mississauga", "Scarborough", "Etobicoke", "Markham", "Richmond Hill", "Thornhill"],
   # How many days (from today) to include in the search
   days: 60,
+  # Which appointment types to include in the search
+  types: ["moderna", "pfizer"],
 }
 OptionParser.new do |opts|
   opts.banner = "Usage: sdm_check.rb [options]"
   opts.on("--cities x,y,z", Array, "List of cities to include in search") { |cities| options[:cities] = cities }
   opts.on("--days 60", Numeric, "Number of days (from today) to include in search") { |days| options[:days] = days }
+  opts.on("--types pfizer,moderna,screening", Array, "List of appointment types") { |types| options[:types] = types }
 end.parse!
 
 SDMCheck.new(**options).report
