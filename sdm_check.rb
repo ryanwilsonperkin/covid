@@ -150,6 +150,8 @@ class SDMCheck
 
   def gql(query, variables = {}, headers = {})
     client.post('/graphql', {query: query, variables: variables}, headers).body
+  rescue Faraday::TimeoutError
+    {}
   end
 
   def client
@@ -171,6 +173,7 @@ class SDMCheck
       'accept-language': 'en-US,en;q=0.9',
     }
     @client ||= Faraday.new 'https://gql.medscheck.medmeapp.com', headers: headers do |conn|
+      conn.options.timeout = 10
       conn.request :json
       conn.response :json, content_type: /\bjson$/
       conn.adapter Faraday.default_adapter
