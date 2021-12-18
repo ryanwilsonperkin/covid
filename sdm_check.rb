@@ -77,7 +77,7 @@ class SDMCheck
 
   def filters
     (0..days).each_slice(DAYS_PER_API_CALL).map do |first, *rest, last|
-      { startDate: Date.today + first, endDate: Date.today + (last || days) }
+      { startDate: Date.today + first, endDate: Date.today + (last || first + 1) }
     end
   end
 
