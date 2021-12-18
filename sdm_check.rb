@@ -115,6 +115,7 @@ class SDMCheck
       enterpriseName: ENTERPRISE,
     }
     headers = {}
+    $stderr.puts("[DEBUG]: publicGetEnterprisePharmacies(#{variables})") if ENV["DEBUG"]
     gql(query, variables, headers)
       .dig("data", "publicGetEnterprisePharmacies")
       .filter { |pharmacy| cities.include? pharmacy.dig("pharmacyAddress", "city") }
@@ -138,6 +139,7 @@ class SDMCheck
       filter: filter,
     }
     headers = { 'x-pharmacyid': pharmacy.id }
+    $stderr.puts("[DEBUG]: publicGetAvailableTimes(#{variables})") if ENV["DEBUG"]
     gql(query, variables, headers)
       .dig("data", "publicGetAvailableTimes")
       .then { |available_times| available_times || [] }
