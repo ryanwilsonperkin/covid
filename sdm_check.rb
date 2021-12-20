@@ -183,19 +183,22 @@ class SDMCheck
   end
 end
 
-options = {
-  # Which cities to include in the search
-  cities: ["Toronto", "Mississauga", "Scarborough", "Etobicoke", "Markham", "Richmond Hill", "Thornhill"],
-  # How many days (from today) to include in the search
-  days: 60,
-  # Which appointment types to include in the search
-  types: ["moderna", "pfizer"],
-}
-OptionParser.new do |opts|
-  opts.banner = "Usage: sdm_check.rb [options]"
-  opts.on("--cities x,y,z", Array, "List of cities to include in search") { |cities| options[:cities] = cities }
-  opts.on("--days 60", Numeric, "Number of days (from today) to include in search") { |days| options[:days] = days }
-  opts.on("--types pfizer,moderna,screening", Array, "List of appointment types") { |types| options[:types] = types }
-end.parse!
+# Only run report if run as script (allows require_relative without side-effects)
+if __FILE__ == $0
+  options = {
+    # Which cities to include in the search
+    cities: ["Toronto", "Mississauga", "Scarborough", "Etobicoke", "Markham", "Richmond Hill", "Thornhill"],
+    # How many days (from today) to include in the search
+    days: 60,
+    # Which appointment types to include in the search
+    types: ["moderna", "pfizer"],
+  }
+  OptionParser.new do |opts|
+    opts.banner = "Usage: sdm_check.rb [options]"
+    opts.on("--cities x,y,z", Array, "List of cities to include in search") { |cities| options[:cities] = cities }
+    opts.on("--days 60", Numeric, "Number of days (from today) to include in search") { |days| options[:days] = days }
+    opts.on("--types pfizer,moderna,screening", Array, "List of appointment types") { |types| options[:types] = types }
+  end.parse!
 
-SDMCheck.new(**options).report
+  SDMCheck.new(**options).report
+end
