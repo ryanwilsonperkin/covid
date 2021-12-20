@@ -60,14 +60,16 @@ class SDMCheck
   attr_reader :types
 
   def report
-    CSV(headers: Appointment::COLUMNS, write_headers: true, force_quotes: true) do |csv|
-      Parallel.each(appointment_types) do |appointment_type_name|
-        Parallel.each(get_available_pharmacies(appointment_type_name)) do |pharmacy|
-          Parallel.each(filters) do |filter|
-            get_available_times(pharmacy, appointment_type_name, filter).each { |appointment| csv << appointment.to_row }
-          end
+    appointments = Parallel.map(appointment_types) do |appointment_type_name|
+      Parallel.map(get_available_pharmacies(appointment_type_name)) do |pharmacy|
+        Parallel.map(filters) do |filter|
+          get_available_times(pharmacy, appointment_type_name, filter)
         end
       end
+    end.flatten.sort_by(&:time)
+
+    CSV(headers: Appointment::COLUMNS, write_headers: true, force_quotes: true) do |csv|
+      appointments.each { |appointment| csv << appointment.to_row }
     end
   end
 
